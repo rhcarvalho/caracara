@@ -89,15 +89,23 @@ def main():
     parser = OptionParser(usage = "usage: %prog [options] [camera_index]")
     parser.add_option("-c", "--cascade", action="store", dest="cascade", type="str",
                       help="Haar cascade file, default %default",
-                      default="haarcascade_frontalface_alt.xml")
+                      default="cascades/haarcascade_frontalface_alt.xml")
+    parser.add_option("-f", "--file", action="store", dest="file", type="str",
+                      help="Image file")
     (options, args) = parser.parse_args()
     
     cascade = cv.Load(options.cascade)
 
     cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
     
-    index = args[:1] and args[0].isdigit() and int(args[0]) or 0
-    capture_from_webcam(index, partial(detect_faces, cascade=cascade))
+    if options.file:
+        img = cv.LoadImage(options.file, 1)
+        img = detect_faces(img, cascade)
+        cv.ShowImage(MAIN_WINDOW, img)
+        cv.WaitKey(0)
+    else:
+        index = args[:1] and args[0].isdigit() and int(args[0]) or 0
+        capture_from_webcam(index, partial(detect_faces, cascade=cascade))
 
     cv.DestroyWindow(MAIN_WINDOW)
 
