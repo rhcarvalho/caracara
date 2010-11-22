@@ -9,6 +9,13 @@ Python implementation by: Roman Stanchak, James Bowman
 import sys
 import cv
 from optparse import OptionParser
+from functools import partial
+
+# TODO:
+# - Integrate with camshift.py
+# - Put sprite on top of tracked object
+# - Put bubble thoughts near faces
+
 
 # Parameters for haar detection
 # From the API:
@@ -25,7 +32,7 @@ min_neighbors = 2
 haar_flags = 0
 MAIN_WINDOW = "result"
 
-def detect_and_draw(img, cascade):
+def detect_faces(img, cascade):
     # allocate temporary images
     gray = cv.CreateImage((img.width,img.height), 8, 1)
     small_img = cv.CreateImage((cv.Round(img.width / image_scale),
@@ -39,26 +46,24 @@ def detect_and_draw(img, cascade):
 
     cv.EqualizeHist(small_img, small_img)
 
-    if(cascade):
-        t = cv.GetTickCount()
-        faces = cv.HaarDetectObjects(small_img, cascade, cv.CreateMemStorage(0),
-                                     haar_scale, min_neighbors, haar_flags, min_size)
-        t = cv.GetTickCount() - t
-        print "detection time = %gms" % (t/(cv.GetTickFrequency()*1000.))
-        if faces:
-            for ((x, y, w, h), n) in faces:
-                # the input to cv.HaarDetectObjects was resized, so scale the 
-                # bounding box of each face and convert it to two CvPoints
-                pt1 = (int(x * image_scale), int(y * image_scale))
-                pt2 = (int((x + w) * image_scale), int((y + h) * image_scale))
-                cv.Rectangle(img, pt1, pt2, cv.RGB(255, 0, 0), 3, 8, 0)
+    t = cv.GetTickCount()
+    faces = cv.HaarDetectObjects(small_img, cascade, cv.CreateMemStorage(0),
+                                 haar_scale, min_neighbors, haar_flags, min_size)
+    t = cv.GetTickCount() - t
+    print "detection time = %gms" % (t/(cv.GetTickFrequency()*1000.))
+    for ((x, y, w, h), n) in faces:
+        # the input to cv.HaarDetectObjects was resized, so scale the 
+        # bounding box of each face and convert it to two CvPoints
+        pt1 = (int(x * image_scale), int(y * image_scale))
+        pt2 = (int((x + w) * image_scale), int((y + h) * image_scale))
+        dark_violet = cv.RGB(148, 0, 211)
+        cv.Rectangle(img, pt1, pt2, dark_violet, 1, 8, 0)
 
-    cv.ShowImage(MAIN_WINDOW, img)
+    return img
     
     
-def capture_from_webcam(index, cascade):
+def capture_from_webcam(index, func):
     capture = cv.CreateCameraCapture(index)
-    frame = cv.QueryFrame(capture)
     frame_copy = None
     while True:
         frame = cv.QueryFrame(capture)
@@ -66,36 +71,33 @@ def capture_from_webcam(index, cascade):
             cv.WaitKey(0)
             break
         if not frame_copy:
-            frame_copy = cv.CreateImage((frame.width,frame.height),
+            frame_copy = cv.CreateImage((frame.width, frame.height),
                                         cv.IPL_DEPTH_8U, frame.nChannels)
         if frame.origin == cv.IPL_ORIGIN_TL:
             cv.Copy(frame, frame_copy)
         else:
             cv.Flip(frame, frame_copy, 0)
         
-        detect_and_draw(frame_copy, cascade)
+        img = func(frame_copy)
+        cv.ShowImage(MAIN_WINDOW, img)
 
         if cv.WaitKey(10) >= 0:
             break
 
 
 def main():
-    parser = OptionParser(usage = "usage: %prog [options] [filename|camera_index]")
+    parser = OptionParser(usage = "usage: %prog [options] [camera_index]")
     parser.add_option("-c", "--cascade", action="store", dest="cascade", type="str",
                       help="Haar cascade file, default %default",
                       default="haarcascade_frontalface_alt.xml")
     (options, args) = parser.parse_args()
     
     cascade = cv.Load(options.cascade)
-    
-    #if len(args) != 1:
-    #    parser.print_help()
-    #    sys.exit(1)
 
     cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
     
     index = args[:1] and args[0].isdigit() and int(args[0]) or 0
-    capture_from_webcam(index, cascade)
+    capture_from_webcam(index, partial(detect_faces, cascade=cascade))
 
     cv.DestroyWindow(MAIN_WINDOW)
 
