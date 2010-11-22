@@ -23,6 +23,7 @@ image_scale = 2
 haar_scale = 1.2
 min_neighbors = 2
 haar_flags = 0
+MAIN_WINDOW = "result"
 
 def detect_and_draw(img, cascade):
     # allocate temporary images
@@ -52,50 +53,52 @@ def detect_and_draw(img, cascade):
                 pt2 = (int((x + w) * image_scale), int((y + h) * image_scale))
                 cv.Rectangle(img, pt1, pt2, cv.RGB(255, 0, 0), 3, 8, 0)
 
-    cv.ShowImage("result", img)
+    cv.ShowImage(MAIN_WINDOW, img)
+    
+    
+def capture_from_webcam(index, cascade):
+    capture = cv.CreateCameraCapture(index)
+    frame = cv.QueryFrame(capture)
+    frame_copy = None
+    while True:
+        frame = cv.QueryFrame(capture)
+        if not frame:
+            cv.WaitKey(0)
+            break
+        if not frame_copy:
+            frame_copy = cv.CreateImage((frame.width,frame.height),
+                                        cv.IPL_DEPTH_8U, frame.nChannels)
+        if frame.origin == cv.IPL_ORIGIN_TL:
+            cv.Copy(frame, frame_copy)
+        else:
+            cv.Flip(frame, frame_copy, 0)
+        
+        detect_and_draw(frame_copy, cascade)
+
+        if cv.WaitKey(10) >= 0:
+            break
 
 
-if __name__ == '__main__':
+def main():
     parser = OptionParser(usage = "usage: %prog [options] [filename|camera_index]")
-    parser.add_option("-c", "--cascade", action="store", dest="cascade", type="str", help="Haar cascade file, default %default", default = r"C:\OpenCV2.1\data\haarcascades\haarcascade_frontalface_alt.xml")
+    parser.add_option("-c", "--cascade", action="store", dest="cascade", type="str",
+                      help="Haar cascade file, default %default",
+                      default="haarcascade_frontalface_alt.xml")
     (options, args) = parser.parse_args()
     
     cascade = cv.Load(options.cascade)
     
-    if len(args) != 1:
-        parser.print_help()
-        sys.exit(1)
+    #if len(args) != 1:
+    #    parser.print_help()
+    #    sys.exit(1)
 
-    input_name = args[0]
-    if input_name.isdigit():
-        capture = cv.CreateCameraCapture(int(input_name))
-    else:
-        capture = None
+    cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
+    
+    index = args[:1] and args[0].isdigit() and int(args[0]) or 0
+    capture_from_webcam(index, cascade)
 
-    cv.NamedWindow("result", 1)
+    cv.DestroyWindow(MAIN_WINDOW)
 
-    if capture:
-        frame_copy = None
-        while True:
-            frame = cv.QueryFrame(capture)
-            if not frame:
-                cv.WaitKey(0)
-                break
-            if not frame_copy:
-                frame_copy = cv.CreateImage((frame.width,frame.height),
-                                            cv.IPL_DEPTH_8U, frame.nChannels)
-            if frame.origin == cv.IPL_ORIGIN_TL:
-                cv.Copy(frame, frame_copy)
-            else:
-                cv.Flip(frame, frame_copy, 0)
-            
-            detect_and_draw(frame_copy, cascade)
 
-            if cv.WaitKey(10) >= 0:
-                break
-    else:
-        image = cv.LoadImage(input_name, 1)
-        detect_and_draw(image, cascade)
-        cv.WaitKey(0)
-
-    cv.DestroyWindow("result")
+if __name__ == '__main__':
+    main()
