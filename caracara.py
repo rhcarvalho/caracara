@@ -13,7 +13,7 @@ from functools import partial
 from optparse import OptionParser
 from random import sample, uniform
 
-from camshift import ObjectTracker
+from objecttracker import ObjectTracker
 
 # TODO:
 # - Put sprite on top of tracked object
