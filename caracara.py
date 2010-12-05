@@ -10,6 +10,7 @@ import sys
 import cv
 from optparse import OptionParser
 from functools import partial
+from random import randint
 
 # TODO:
 # - Integrate with camshift.py
@@ -97,10 +98,13 @@ def capture_from_file(file):
 
 def write_text(img, text, origin=(20, 20), color=cv.RGB(0, 0, 0)):
     font = cv.InitFont(fontFace=cv.CV_FONT_HERSHEY_PLAIN, hscale=1.0, vscale=1.0, shear=0, thickness=1, lineType=cv.CV_AA)
-    baloon_color = cv.RGB(255, 255, 255)
-    cv.FillConvexPoly(img, ((70, 10), (130, 10), (110, 70)), color=baloon_color, lineType=cv.CV_AA, shift=0)
-    cv.EllipseBox(img, box=((90, 10), (340, 60), 2), color=baloon_color, thickness=-1, lineType=cv.CV_AA, shift=0)
+    origin = (origin[0] + randint(-3, 3), origin[1] + randint(-3, 3))
     cv.PutText(img, text, origin, font, color)
+    
+def draw_baloons(img, faces, color=cv.RGB(255, 255, 255)):
+    cv.FillConvexPoly(img, ((70, 10), (130, 10), (110 + randint(-10, 10), 70)), color=color, lineType=cv.CV_AA, shift=0)
+    #cv.Circle(img, center=(130, 20), radius=10, color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
+    cv.EllipseBox(img, box=((90, 10), (340, 60), 2), color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
 
 
 def main():
@@ -125,6 +129,7 @@ def main():
     for img in image_iterator:
         faces = detect_faces(img, cascade)
         draw_surrounding_rectangles(img, faces)
+        draw_baloons(img, faces)
         write_text(img, "Go go my script!")
         cv.ShowImage(MAIN_WINDOW, img)
         if cv.WaitKey(10) >= 0:
