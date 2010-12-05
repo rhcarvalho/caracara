@@ -19,10 +19,10 @@ from functools import partial
 
 # Parameters for haar detection
 # From the API:
-# The default parameters (scale_factor=2, min_neighbors=3, flags=0) are tuned 
-# for accurate yet slow object detection. For a faster operation on real video 
-# images the settings are: 
-# scale_factor=1.2, min_neighbors=2, flags=CV_HAAR_DO_CANNY_PRUNING, 
+# The default parameters (scale_factor=2, min_neighbors=3, flags=0) are tuned
+# for accurate yet slow object detection. For a faster operation on real video
+# images the settings are:
+# scale_factor=1.2, min_neighbors=2, flags=CV_HAAR_DO_CANNY_PRUNING,
 # min_size=<minimum possible face size
 
 min_size = (20, 20)
@@ -30,7 +30,7 @@ image_scale = 2
 haar_scale = 1.2
 min_neighbors = 2
 haar_flags = 0
-MAIN_WINDOW = "result"
+MAIN_WINDOW = "CaraCara"
 
 def detect_faces(img, cascade):
     # allocate temporary images
@@ -51,19 +51,21 @@ def detect_faces(img, cascade):
                                  haar_scale, min_neighbors, haar_flags, min_size)
     t = cv.GetTickCount() - t
     print "detection time = %gms" % (t/(cv.GetTickFrequency()*1000.))
+    return faces
+
+
+def draw_surrounding_rectangles(img, faces):
     for ((x, y, w, h), n) in faces:
-        # the input to cv.HaarDetectObjects was resized, so scale the 
+        # the input to cv.HaarDetectObjects was resized, so scale the
         # bounding box of each face and convert it to two CvPoints
         pt1 = (int(x * image_scale), int(y * image_scale))
         pt2 = (int((x + w) * image_scale), int((y + h) * image_scale))
         dark_violet = cv.RGB(148, 0, 211)
         cv.Rectangle(img, pt1, pt2, dark_violet, 1, 8, 0)
-
-    write_text(img, "Eu penso, logo existo")
     return img
-    
-    
-def capture_from_webcam(index, func):
+
+
+def capture_from_webcam(index):
     capture = cv.CreateCameraCapture(index)
     frame_copy = None
     while True:
@@ -71,19 +73,26 @@ def capture_from_webcam(index, func):
         if not frame:
             cv.WaitKey(0)
             break
-        if not frame_copy:
+        if frame_copy is None:
             frame_copy = cv.CreateImage((frame.width, frame.height),
                                         cv.IPL_DEPTH_8U, frame.nChannels)
         if frame.origin == cv.IPL_ORIGIN_TL:
             cv.Copy(frame, frame_copy)
         else:
             cv.Flip(frame, frame_copy, 0)
-        
-        img = func(frame_copy)
-        cv.ShowImage(MAIN_WINDOW, img)
 
-        if cv.WaitKey(10) >= 0:
-            break
+        yield frame_copy
+
+
+def capture_from_file(file):
+    frame = cv.LoadImage(file, 1)
+    frame_copy = None
+    while True:
+        if frame_copy is None:
+            frame_copy = cv.CreateImage((frame.width, frame.height),
+                                        cv.IPL_DEPTH_8U, frame.nChannels)
+        cv.Copy(frame, frame_copy)
+        yield frame_copy
 
 
 def write_text(img, text, origin=(20, 20), color=cv.RGB(0, 0, 0)):
@@ -91,7 +100,7 @@ def write_text(img, text, origin=(20, 20), color=cv.RGB(0, 0, 0)):
     baloon_color = cv.RGB(255, 255, 255)
     cv.FillConvexPoly(img, ((70, 10), (130, 10), (110, 70)), color=baloon_color, lineType=cv.CV_AA, shift=0)
     cv.EllipseBox(img, box=((90, 10), (340, 60), 2), color=baloon_color, thickness=-1, lineType=cv.CV_AA, shift=0)
-    cv.PutText(img, text, origin, font, color) 
+    cv.PutText(img, text, origin, font, color)
 
 
 def main():
@@ -102,19 +111,24 @@ def main():
     parser.add_option("-f", "--file", action="store", dest="file", type="str",
                       help="Image file")
     (options, args) = parser.parse_args()
-    
+
     cascade = cv.Load(options.cascade)
 
     cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
-    
+
     if options.file:
-        img = cv.LoadImage(options.file, 1)
-        img = detect_faces(img, cascade)
-        cv.ShowImage(MAIN_WINDOW, img)
-        cv.WaitKey(0)
+        image_iterator = capture_from_file(options.file)
     else:
         index = args[:1] and args[0].isdigit() and int(args[0]) or 0
-        capture_from_webcam(index, partial(detect_faces, cascade=cascade))
+        image_iterator = capture_from_webcam(index)
+
+    for img in image_iterator:
+        faces = detect_faces(img, cascade)
+        draw_surrounding_rectangles(img, faces)
+        write_text(img, "Go go my script!")
+        cv.ShowImage(MAIN_WINDOW, img)
+        if cv.WaitKey(10) >= 0:
+            break
 
     cv.DestroyWindow(MAIN_WINDOW)
 
