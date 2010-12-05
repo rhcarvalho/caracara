@@ -59,6 +59,7 @@ def detect_faces(img, cascade):
         dark_violet = cv.RGB(148, 0, 211)
         cv.Rectangle(img, pt1, pt2, dark_violet, 1, 8, 0)
 
+    write_text(img, "Eu penso, logo existo")
     return img
     
     
@@ -83,6 +84,14 @@ def capture_from_webcam(index, func):
 
         if cv.WaitKey(10) >= 0:
             break
+
+
+def write_text(img, text, origin=(20, 20), color=cv.RGB(0, 0, 0)):
+    font = cv.InitFont(fontFace=cv.CV_FONT_HERSHEY_PLAIN, hscale=1.0, vscale=1.0, shear=0, thickness=1, lineType=cv.CV_AA)
+    baloon_color = cv.RGB(255, 255, 255)
+    cv.FillConvexPoly(img, ((70, 10), (130, 10), (110, 70)), color=baloon_color, lineType=cv.CV_AA, shift=0)
+    cv.EllipseBox(img, box=((90, 10), (340, 60), 2), color=baloon_color, thickness=-1, lineType=cv.CV_AA, shift=0)
+    cv.PutText(img, text, origin, font, color) 
 
 
 def main():
