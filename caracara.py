@@ -10,7 +10,7 @@ import sys
 import cv
 from optparse import OptionParser
 from functools import partial
-from random import randint
+from random import uniform
 
 # TODO:
 # - Integrate with camshift.py
@@ -52,7 +52,7 @@ def detect_faces(img, cascade):
     faces = cv.HaarDetectObjects(small_img, cascade, cv.CreateMemStorage(0),
                                  haar_scale, min_neighbors, haar_flags, min_size)
     t = cv.GetTickCount() - t
-    print "detection time = %gms" % (t/(cv.GetTickFrequency()*1000.))
+    print "detection time = %gms" % (t / (cv.GetTickFrequency() * 1000.))
     
     # the input to cv.HaarDetectObjects was resized, so scale the
     # bounding box of each face
@@ -99,18 +99,27 @@ def capture_from_file(file):
 
 
 def write_text(img, text, faces, color=cv.RGB(0, 0, 0)):
+    """Write text next first face of faces of img""" 
     font = cv.InitFont(fontFace=cv.CV_FONT_HERSHEY_PLAIN, hscale=1.0, vscale=1.0, shear=0, thickness=1, lineType=cv.CV_AA)
     for (x, y, w, h) in faces[:1]:
-        origin = (x - 130 + randint(-3, 3), y - 35 + randint(-3, 3))
+        # check size of rendered text
+        (width, height), baseline = cv.GetTextSize(text, font)
+        # bottom-left coordinates of text randomly shifted
+        origin = (int((x - width) * uniform(0.95, 1.05)), int((y - height) * uniform(0.95, 1.05)))
+        center = (origin[0] + width / 2, origin[1] - height / 2)
+        draw_balloon(img, (center[0], center[1], width, height))
         cv.PutText(img, text, origin, font, color)
 
 
-def draw_baloons(img, faces, color=cv.RGB(255, 255, 255)):
-    for (x, y, w, h) in faces[:1]:
-        triangle = ((x - 50, y - 20), (x + 10, y - 20), (x + randint(-10, 10), y))
-        cv.FillConvexPoly(img, triangle, color=color, lineType=cv.CV_AA, shift=0)
-        #cv.Circle(img, center=(130, 20), radius=10, color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
-        cv.EllipseBox(img, box=((x - 60, y - 40), (280, 50), 2), color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
+def draw_balloon(img, rect, color=cv.RGB(255, 255, 255)):
+    """Draw balloon centered in rect of img."""
+    x, y, w, h = rect
+    # pad width and height
+    w, h = int(w * 1.4), int(h * 4.2)
+    triangle = ((x, y), (x + w / 3, y), (int((x + w / 3) * uniform(0.95, 1.1)), y + h))
+    cv.FillConvexPoly(img, triangle, color=color, lineType=cv.CV_AA, shift=0)
+    angle = 2 * uniform(0, 1)
+    cv.EllipseBox(img, box=((x, y), (w, h), angle), color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
 
 
 def main():
@@ -135,7 +144,6 @@ def main():
     for img in image_iterator:
         faces = detect_faces(img, cascade)
         draw_surrounding_rectangles(img, faces)
-        draw_baloons(img, faces)
         write_text(img, "Go go my script!", faces)
         cv.ShowImage(MAIN_WINDOW, img)
         if cv.WaitKey(10) >= 0:
