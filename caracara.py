@@ -38,6 +38,22 @@ logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s [%(levelname)s] %(message)s')
 
 
+def cached_times(n):
+    def decorator(func):
+        memory = dict(
+            call_counter = 0,
+            cache = None
+        )
+        def cached_func(*args, **kwargs):
+            if memory['call_counter'] % n == 0:
+                memory['cache'] = func(*args, **kwargs)
+            memory['call_counter'] = (memory['call_counter'] + 1) % n
+            return memory['cache']
+        return cached_func
+    return decorator
+
+
+@cached_times(10)
 def detect_faces(img, cascade):
     """Detect faces from img using cascade.
     
