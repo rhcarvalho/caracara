@@ -10,7 +10,7 @@ import sys
 import cv
 from optparse import OptionParser
 from functools import partial
-from random import uniform
+from random import sample, uniform
 
 # TODO:
 # - Integrate with camshift.py
@@ -35,6 +35,10 @@ MAIN_WINDOW = "CaraCara"
 
 
 def detect_faces(img, cascade):
+    """Detect faces from img using cascade.
+    
+    Return a list of tuples (x, y, width, height) where (x, y) is
+    the coordinate of the top left corner of a face."""
     # allocate temporary images
     gray = cv.CreateImage((img.width,img.height), 8, 1)
     small_img = cv.CreateImage((cv.Round(img.width / image_scale),
@@ -69,6 +73,7 @@ def draw_surrounding_rectangles(img, faces):
 
 
 def capture_from_webcam(index):
+    """Generator over webcam frames. Yields a new image infinitely."""
     capture = cv.CreateCameraCapture(index)
     frame_copy = None
     while True:
@@ -88,6 +93,7 @@ def capture_from_webcam(index):
 
 
 def capture_from_file(file):
+    """Generator over a single file. Yields a copy of the image file infinitely."""
     frame = cv.LoadImage(file, 1)
     frame_copy = None
     while True:
@@ -98,10 +104,15 @@ def capture_from_file(file):
         yield frame_copy
 
 
-def write_text(img, text, faces, color=cv.RGB(0, 0, 0)):
-    """Write text next first face of faces of img""" 
+def write_text(img, texts, faces, color=cv.RGB(0, 0, 0)):
+    """Write a random text from texts next each face from faces of img.
+    
+    Length of texts must be greater than or equal length of faces.""" 
     font = cv.InitFont(fontFace=cv.CV_FONT_HERSHEY_PLAIN, hscale=1.0, vscale=1.0, shear=0, thickness=1, lineType=cv.CV_AA)
-    for (x, y, w, h) in faces[:1]:
+    # consider only faces for which we can pick up a text
+    faces = faces[:len(texts)]
+    texts = sample(texts, len(faces))
+    for text, (x, y, w, h) in zip(texts, faces):
         # check size of rendered text
         (width, height), baseline = cv.GetTextSize(text, font)
         # bottom-left coordinates of text randomly shifted
@@ -144,9 +155,10 @@ def main():
     for img in image_iterator:
         faces = detect_faces(img, cascade)
         draw_surrounding_rectangles(img, faces)
-        write_text(img, "Go go my script!", faces)
+        texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
+        write_text(img, texts, faces)
         cv.ShowImage(MAIN_WINDOW, img)
-        if cv.WaitKey(10) >= 0:
+        if cv.WaitKey(1 * 1000) >= 0:
             break
 
     cv.DestroyWindow(MAIN_WINDOW)
