@@ -6,11 +6,11 @@ The program finds faces in a camera image or video stream and displays a red box
 Original C implementation by:  ?
 Python implementation by: Roman Stanchak, James Bowman
 """
+import cv
 import logging
 import sys
-import cv
-from optparse import OptionParser
 from functools import partial
+from optparse import OptionParser
 from random import sample, uniform
 
 # TODO:
@@ -53,7 +53,7 @@ def cached_times(n):
     return decorator
 
 
-@cached_times(10)
+@cached_times(5)
 def detect_faces(img, cascade):
     """Detect faces from img using cascade.
     
@@ -195,6 +195,7 @@ def main():
         index = args[:1] and args[0].isdigit() and int(args[0]) or 0
         image_iterator = capture_from_webcam(index)
 
+    fps_buffer = []
     for img in image_iterator:
         t = cv.GetTickCount()
         faces = detect_faces(img, cascade)
@@ -205,7 +206,10 @@ def main():
         if cv.WaitKey(10) >= 0:
             break
         t = cv.GetTickCount() - t
-        logging.debug("%.4f fps" % ((cv.GetTickFrequency() * 1000000.) / t))
+        fps_buffer.append((cv.GetTickFrequency() * 1000000.) / t)
+        if len(fps_buffer) == 10:
+            fps_buffer = [sum(fps_buffer) / 10]
+            logging.debug("%.4f fps" % fps_buffer[0])
 
     cv.DestroyWindow(MAIN_WINDOW)
 
