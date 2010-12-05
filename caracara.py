@@ -13,10 +13,10 @@ from functools import partial
 from optparse import OptionParser
 from random import sample, uniform
 
+from camshift import ObjectTracker
+
 # TODO:
-# - Integrate with camshift.py
 # - Put sprite on top of tracked object
-# - Put bubble thoughts near faces
 
 
 # Parameters for haar detection
@@ -188,6 +188,7 @@ def main():
     cascade = cv.Load(options.cascade)
 
     cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
+    tracker = ObjectTracker(MAIN_WINDOW)
 
     if options.file:
         image_iterator = capture_from_file(options.file)
@@ -199,6 +200,7 @@ def main():
     for img in image_iterator:
         t = cv.GetTickCount()
         faces = detect_faces(img, cascade)
+        tracker.track_object(img)
         #draw_surrounding_rectangles(img, faces)
         texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
         write_text(img, texts, faces)
