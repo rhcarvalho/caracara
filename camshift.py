@@ -5,7 +5,7 @@ import cv
 def is_rect_nonzero(r):
     (_,_,w,h) = r
     return (w > 0) and (h > 0)
-    
+
 
 class ObjectTracker:
     def __init__(self, window):
@@ -15,7 +15,7 @@ class ObjectTracker:
         self.drag_start = None      # Set to (x,y) when mouse starts drag
         self.track_window = None    # Set to rect when the mouse drag finishes
         self.selection = None
-        
+
     def mouse_handler(self, event, x, y, flags, param):
         if event == cv.CV_EVENT_LBUTTONDOWN:
             self.drag_start = (x, y)
@@ -64,19 +64,21 @@ class ObjectTracker:
                 cv.ConvertScale(self.hist.bins, self.hist.bins, 255. / max_val)
         elif self.track_window and is_rect_nonzero(self.track_window):
             cv.EllipseBox(img, track_box, cv.CV_RGB(255, 0, 0), 3, cv.CV_AA, 0)
-    
-        
-def run():
+
+
+def main():
+    MAIN_WINDOW = "ObjectTracker"
     capture = cv.CaptureFromCAM(0)
-    cv.NamedWindow("CamShiftDemo", 1)
-    tracker = ObjectTracker("CamShiftDemo")
+    cv.NamedWindow(MAIN_WINDOW, 1)
+    tracker = ObjectTracker(MAIN_WINDOW)
     while True:
         frame = cv.QueryFrame(capture)
         tracker.track_object(frame)
-        cv.ShowImage("CamShiftDemo", frame)
+        cv.ShowImage(MAIN_WINDOW, frame)
         if cv.WaitKey(10) >= 0:
             break
-    cv.DestroyWindow("CamShiftDemo")
+    cv.DestroyWindow(MAIN_WINDOW)
 
-if __name__=="__main__":
-    run()
+
+if __name__ == '__main__':
+    main()
