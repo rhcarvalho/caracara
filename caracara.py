@@ -33,6 +33,7 @@ min_neighbors = 2
 haar_flags = 0
 MAIN_WINDOW = "CaraCara"
 
+
 def detect_faces(img, cascade):
     # allocate temporary images
     gray = cv.CreateImage((img.width,img.height), 8, 1)
@@ -52,18 +53,19 @@ def detect_faces(img, cascade):
                                  haar_scale, min_neighbors, haar_flags, min_size)
     t = cv.GetTickCount() - t
     print "detection time = %gms" % (t/(cv.GetTickFrequency()*1000.))
-    return faces
+    
+    # the input to cv.HaarDetectObjects was resized, so scale the
+    # bounding box of each face
+    scaled_faces = [tuple(map(lambda k: int(k * image_scale), vec)) for (vec, n) in faces]
+    return scaled_faces
 
 
 def draw_surrounding_rectangles(img, faces):
-    for ((x, y, w, h), n) in faces:
-        # the input to cv.HaarDetectObjects was resized, so scale the
-        # bounding box of each face and convert it to two CvPoints
-        pt1 = (int(x * image_scale), int(y * image_scale))
-        pt2 = (int((x + w) * image_scale), int((y + h) * image_scale))
+    for (x, y, w, h) in faces:
+        pt1 = (x, y)
+        pt2 = (x + w, y + h)
         dark_violet = cv.RGB(148, 0, 211)
         cv.Rectangle(img, pt1, pt2, dark_violet, 1, 8, 0)
-    return img
 
 
 def capture_from_webcam(index):
@@ -96,15 +98,19 @@ def capture_from_file(file):
         yield frame_copy
 
 
-def write_text(img, text, origin=(20, 20), color=cv.RGB(0, 0, 0)):
+def write_text(img, text, faces, color=cv.RGB(0, 0, 0)):
     font = cv.InitFont(fontFace=cv.CV_FONT_HERSHEY_PLAIN, hscale=1.0, vscale=1.0, shear=0, thickness=1, lineType=cv.CV_AA)
-    origin = (origin[0] + randint(-3, 3), origin[1] + randint(-3, 3))
-    cv.PutText(img, text, origin, font, color)
-    
+    for (x, y, w, h) in faces[:1]:
+        origin = (x - 130 + randint(-3, 3), y - 35 + randint(-3, 3))
+        cv.PutText(img, text, origin, font, color)
+
+
 def draw_baloons(img, faces, color=cv.RGB(255, 255, 255)):
-    cv.FillConvexPoly(img, ((70, 10), (130, 10), (110 + randint(-10, 10), 70)), color=color, lineType=cv.CV_AA, shift=0)
-    #cv.Circle(img, center=(130, 20), radius=10, color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
-    cv.EllipseBox(img, box=((90, 10), (340, 60), 2), color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
+    for (x, y, w, h) in faces[:1]:
+        triangle = ((x - 50, y - 20), (x + 10, y - 20), (x + randint(-10, 10), y))
+        cv.FillConvexPoly(img, triangle, color=color, lineType=cv.CV_AA, shift=0)
+        #cv.Circle(img, center=(130, 20), radius=10, color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
+        cv.EllipseBox(img, box=((x - 60, y - 40), (280, 50), 2), color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
 
 
 def main():
@@ -130,7 +136,7 @@ def main():
         faces = detect_faces(img, cascade)
         draw_surrounding_rectangles(img, faces)
         draw_baloons(img, faces)
-        write_text(img, "Go go my script!")
+        write_text(img, "Go go my script!", faces)
         cv.ShowImage(MAIN_WINDOW, img)
         if cv.WaitKey(10) >= 0:
             break
