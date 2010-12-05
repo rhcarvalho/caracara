@@ -7,6 +7,20 @@ def is_rect_nonzero(r):
     return (w > 0) and (h > 0)
 
 
+def overlay_image(src, overlay, location, S, D):
+    location = tuple(map(int, location))
+    for x in xrange(overlay.width):
+        if x + location[0] >= src.width:
+            continue
+        for y in xrange(overlay.height):
+            if y + location[1] >= src.height:
+                continue
+            source = cv.Get2D(src, y + location[1], x + location[0])
+            over = cv.Get2D(overlay, y, x)
+            merged = tuple(S[i] * source[i] + D[i] * over[i] for i in xrange(4))
+            cv.Set2D(src, y + location[1], x + location[0], merged)
+
+
 class ObjectTracker:
     def __init__(self, window):
         cv.SetMouseCallback(window, self.mouse_handler)
@@ -63,7 +77,10 @@ class ObjectTracker:
             if max_val != 0:
                 cv.ConvertScale(self.hist.bins, self.hist.bins, 255. / max_val)
         elif self.track_window and is_rect_nonzero(self.track_window):
-            cv.EllipseBox(img, track_box, cv.CV_RGB(255, 0, 0), 3, cv.CV_AA, 0)
+            #cv.EllipseBox(img, track_box, cv.CV_RGB(45, 255, 45), -1, cv.CV_AA, 0)
+            overlay = cv.LoadImage("python.png")
+            top_left = (track_box[0][0] - overlay.width / 2, track_box[0][1] - overlay.height / 2)
+            overlay_image(img, overlay, top_left, (0,0,0,0), (1,1,1,1))
 
 
 def main():
