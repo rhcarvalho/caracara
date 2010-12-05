@@ -6,6 +6,7 @@ The program finds faces in a camera image or video stream and displays a red box
 Original C implementation by:  ?
 Python implementation by: Roman Stanchak, James Bowman
 """
+import logging
 import sys
 import cv
 from optparse import OptionParser
@@ -33,6 +34,9 @@ min_neighbors = 2
 haar_flags = 0
 MAIN_WINDOW = "CaraCara"
 
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s [%(levelname)s] %(message)s')
+
 
 def detect_faces(img, cascade):
     """Detect faces from img using cascade.
@@ -56,8 +60,8 @@ def detect_faces(img, cascade):
     faces = cv.HaarDetectObjects(small_img, cascade, cv.CreateMemStorage(0),
                                  haar_scale, min_neighbors, haar_flags, min_size)
     t = cv.GetTickCount() - t
-    print "detection time = %gms" % (t / (cv.GetTickFrequency() * 1000.))
-    
+    logging.info("detection time = %gms" % (t / (cv.GetTickFrequency() * 1000.)))
+
     # the input to cv.HaarDetectObjects was resized, so scale the
     # bounding box of each face
     scaled_faces = [tuple(map(lambda k: int(k * image_scale), vec)) for (vec, n) in faces]
@@ -65,6 +69,7 @@ def detect_faces(img, cascade):
 
 
 def draw_surrounding_rectangles(img, faces):
+    """Draw a rectangle around each face of img."""
     for (x, y, w, h) in faces:
         pt1 = (x, y)
         pt2 = (x + w, y + h)
@@ -117,6 +122,28 @@ def write_text(img, texts, faces, color=cv.RGB(0, 0, 0)):
         (width, height), baseline = cv.GetTextSize(text, font)
         # bottom-left coordinates of text randomly shifted
         origin = (int((x - width) * uniform(0.95, 1.05)), int((y - height) * uniform(0.95, 1.05)))
+        
+        if width > img.width or height > img.height:
+            logging.warning('Image is smaller than the text: (%d, %d) x (%d, %d)' % (img.width, img.height, width, height))
+            break
+        
+        # test text boundaries against image
+        if origin[0] < 0:
+            logging.info("Moved text balloon to the right")
+            origin = (0, origin[1])
+        
+        if origin[0] + width > img.width:
+            logging.info("Moved text balloon to the left")
+            origin = (img.width - width, origin[1])
+            
+        if origin[1] - height < 0:
+            logging.info("Moved text balloon down")
+            origin = (origin[0], height)
+            
+        if origin[1] > img.height:
+            logging.info("Moved text balloon up")
+            origin = (origin[0], img.height - baseline)
+        
         center = (origin[0] + width / 2, origin[1] - height / 2)
         draw_balloon(img, (center[0], center[1], width, height))
         cv.PutText(img, text, origin, font, color)
@@ -153,13 +180,16 @@ def main():
         image_iterator = capture_from_webcam(index)
 
     for img in image_iterator:
+        t = cv.GetTickCount()
         faces = detect_faces(img, cascade)
-        draw_surrounding_rectangles(img, faces)
+        #draw_surrounding_rectangles(img, faces)
         texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
         write_text(img, texts, faces)
         cv.ShowImage(MAIN_WINDOW, img)
-        if cv.WaitKey(1 * 1000) >= 0:
+        if cv.WaitKey(10) >= 0:
             break
+        t = cv.GetTickCount() - t
+        logging.debug("%.4f fps" % ((cv.GetTickFrequency() * 1000000.) / t))
 
     cv.DestroyWindow(MAIN_WINDOW)
 
