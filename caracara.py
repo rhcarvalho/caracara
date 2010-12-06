@@ -8,6 +8,7 @@ Python implementation by: Roman Stanchak, James Bowman
 """
 import cv
 import logging
+from collections import deque
 from optparse import OptionParser
 from random import uniform
 from traceback import format_exc
@@ -158,7 +159,7 @@ class CaraCara:
         self.window_name = window_name
         self.image_iterator = image_iterator
         self.cascade = cv.Load(cascade)
-        self.texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
+        self.texts = deque(("What am I gonna do?", "Mark an object with the mouse!", "Tracking..."))
         self.tracker = ObjectTracker(window_name, overlay)
 
     def mainloop(self):
@@ -181,6 +182,7 @@ class CaraCara:
                 if len(fps_buffer) == group_size:
                     fps_buffer = [sum(fps_buffer) / group_size]
                     logging.info("%.4f fps" % fps_buffer[0])
+                    self.texts.rotate(-1)
             except:
                 logging.critical(format_exc())
                 self.tracker.reset()
