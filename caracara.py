@@ -1,11 +1,4 @@
 #!/usr/bin/python
-"""
-This program is demonstration for face and object detection using haar-like features.
-The program finds faces in a camera image or video stream and displays a red box around them.
-
-Original C implementation by:  ?
-Python implementation by: Roman Stanchak, James Bowman
-"""
 import cv
 import logging
 from collections import deque
@@ -36,7 +29,7 @@ MAIN_WINDOW = "CaraCara"
 @compute_time
 def detect_faces(img, cascade):
     """Detect faces from img using cascade.
-    
+
     Return a list of tuples (x, y, width, height) where (x, y) is
     the coordinate of the top left corner of a face."""
     # allocate temporary images
@@ -106,36 +99,36 @@ def capture_from_file(file):
 
 def write_text(img, texts, faces, color=cv.RGB(0, 0, 0)):
     """Write a random text from texts next each face from faces of img.
-    
-    Length of texts must be greater than or equal length of faces.""" 
+
+    Length of texts must be greater than or equal length of faces."""
     font = cv.InitFont(fontFace=cv.CV_FONT_HERSHEY_PLAIN, hscale=1.0, vscale=1.0, shear=0, thickness=1, lineType=cv.CV_AA)
     for text, (x, y, w, h) in zip(texts, faces):
         # check size of rendered text
         (width, height), baseline = cv.GetTextSize(text, font)
         # bottom-left coordinates of text randomly shifted
         origin = (int((x - width) * uniform(0.95, 1.05)), int((y - height) * uniform(0.95, 1.05)))
-        
+
         if width > img.width or height > img.height:
             logging.warning('Image is smaller than the text: (%d, %d) x (%d, %d)' % (img.width, img.height, width, height))
             break
-        
+
         # test text boundaries against image
         if origin[0] < 0:
             logging.debug("Moved text balloon to the right")
             origin = (0, origin[1])
-        
+
         if origin[0] + width > img.width:
             logging.debug("Moved text balloon to the left")
             origin = (img.width - width, origin[1])
-            
+
         if origin[1] - height < 0:
             logging.debug("Moved text balloon down")
             origin = (origin[0], height)
-            
+
         if origin[1] > img.height:
             logging.debug("Moved text balloon up")
             origin = (origin[0], img.height - baseline)
-        
+
         center = (origin[0] + width / 2, origin[1] - height / 2)
         draw_balloon(img, (center[0], center[1], width, height))
         cv.PutText(img, text, origin, font, color)

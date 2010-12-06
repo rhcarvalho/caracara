@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import cv
 import Image
 import logging
@@ -28,7 +27,7 @@ def apply_overlay_image(src, overlay, (x, y)):
         return src
     img = Image.fromstring("RGB", cv.GetSize(src), src.tostring()[::-1]).rotate(180).convert("RGBA")
     img.paste(overlay, (x, y), overlay)
-    
+
     cv_im = cv.CreateImageHeader(img.size, cv.IPL_DEPTH_8U, 3)
     cv.SetData(cv_im, img.convert("RGB").rotate(180).tostring()[::-1], img.size[0]*3)
     #cv.CvtColor(sub, sub, cv.CV_RGB2BGR)
@@ -44,7 +43,7 @@ class ObjectTracker:
         w, h = map(float, self.overlay.size)
         self.overlay_aspect_ratio = w / h
         self.reset()
-        
+
     def reset(self):
         self.hist = cv.CreateHist([180], cv.CV_HIST_ARRAY, [(0, 180)], 1)
         self.drag_start = None      # Set to (x,y) when mouse starts drag
@@ -138,7 +137,7 @@ def main():
                       help="Object tracking overlay image",
                       default="images/python.png")
     (options, args) = parser.parse_args()
-    
+
     tracker = ObjectTracker(MAIN_WINDOW, options.overlay)
     tracker.mainloop()
 
