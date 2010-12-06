@@ -14,6 +14,7 @@ from optparse import OptionParser
 from random import sample, uniform
 
 from objecttracker import ObjectTracker
+from util import cached_times, compute_time
 
 # TODO:
 # - Put sprite on top of tracked object
@@ -34,26 +35,9 @@ min_neighbors = 2
 haar_flags = 0
 MAIN_WINDOW = "CaraCara"
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s [%(levelname)s] %(message)s')
-
-
-def cached_times(n):
-    def decorator(func):
-        memory = dict(
-            call_counter = 0,
-            cache = None
-        )
-        def cached_func(*args, **kwargs):
-            if memory['call_counter'] % n == 0:
-                memory['cache'] = func(*args, **kwargs)
-            memory['call_counter'] = (memory['call_counter'] + 1) % n
-            return memory['cache']
-        return cached_func
-    return decorator
-
 
 @cached_times(5)
+@compute_time
 def detect_faces(img, cascade):
     """Detect faces from img using cascade.
     
@@ -72,11 +56,8 @@ def detect_faces(img, cascade):
 
     cv.EqualizeHist(small_img, small_img)
 
-    t = cv.GetTickCount()
     faces = cv.HaarDetectObjects(small_img, cascade, cv.CreateMemStorage(0),
                                  haar_scale, min_neighbors, haar_flags, min_size)
-    t = cv.GetTickCount() - t
-    logging.info("detection time = %gms" % (t / (cv.GetTickFrequency() * 1000.)))
 
     # the input to cv.HaarDetectObjects was resized, so scale the
     # bounding box of each face
@@ -106,7 +87,9 @@ def capture_from_webcam(index):
             frame_copy = cv.CreateImage((frame.width, frame.height),
                                         cv.IPL_DEPTH_8U, frame.nChannels)
         if frame.origin == cv.IPL_ORIGIN_TL:
-            cv.Copy(frame, frame_copy)
+            #cv.Copy(frame, frame_copy)
+            # Mirror
+            cv.Flip(frame, frame_copy, 1)
         else:
             cv.Flip(frame, frame_copy, 0)
 
@@ -188,7 +171,7 @@ def main():
     cascade = cv.Load(options.cascade)
 
     cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
-    tracker = ObjectTracker(MAIN_WINDOW)
+    tracker = ObjectTracker(MAIN_WINDOW, "python.png")
 
     if options.file:
         image_iterator = capture_from_file(options.file)
@@ -200,7 +183,7 @@ def main():
     for img in image_iterator:
         t = cv.GetTickCount()
         faces = detect_faces(img, cascade)
-        tracker.track_object(img)
+        img = tracker.track_object(img)
         #draw_surrounding_rectangles(img, faces)
         texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
         write_text(img, texts, faces)

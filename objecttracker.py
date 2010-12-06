@@ -1,34 +1,45 @@
 #!/usr/bin/env python
 
 import cv
+import Image
+from util import compute_time
+
+def is_rect_within_img(rect, img):
+    x, y, w, h = rect
+    return 0 <= x < img.width and 0 <= y < img.height and 0 <= x + w < img.width and 0 <= y + h < img.height
 
 def is_rect_nonzero(r):
     (_,_,w,h) = r
     return (w > 0) and (h > 0)
 
 
-def overlay_image(src, overlay, location, S, D):
-    location = tuple(map(int, location))
-    for x in xrange(overlay.width):
-        if x + location[0] >= src.width:
-            continue
-        for y in xrange(overlay.height):
-            if y + location[1] >= src.height:
-                continue
-            source = cv.Get2D(src, y + location[1], x + location[0])
-            over = cv.Get2D(overlay, y, x)
-            merged = tuple(S[i] * source[i] + D[i] * over[i] for i in xrange(4))
-            cv.Set2D(src, y + location[1], x + location[0], merged)
+@compute_time
+def apply_overlay_image(src, overlay, (x, y)):
+    """src: Image from OpenCV, overlay: Image from PIL"""
+    x, y = map(int, (x, y))
+    if not (0 <= x < src.width and 0 <= y < src.height):
+        return src
+    img = Image.fromstring("RGB", cv.GetSize(src), src.tostring()[::-1]).rotate(180).convert("RGBA")
+    img.paste(overlay, (x, y), overlay)
+    
+    cv_im = cv.CreateImageHeader(img.size, cv.IPL_DEPTH_8U, 3)
+    cv.SetData(cv_im, img.convert("RGB").rotate(180).tostring()[::-1], img.size[0]*3)
+    #cv.CvtColor(sub, sub, cv.CV_RGB2BGR)
+    return cv_im
 
 
 class ObjectTracker:
-    def __init__(self, window):
+    def __init__(self, window, overlay):
         cv.SetMouseCallback(window, self.mouse_handler)
         self.hist = cv.CreateHist([180], cv.CV_HIST_ARRAY, [(0, 180)], 1)
 
         self.drag_start = None      # Set to (x,y) when mouse starts drag
         self.track_window = None    # Set to rect when the mouse drag finishes
         self.selection = None
+        
+        self.overlay = Image.open(overlay).convert("RGBA")
+        w, h = map(float, self.overlay.size)
+        self.overlay_aspect_ratio = w / h
 
     def mouse_handler(self, event, x, y, flags, param):
         if event == cv.CV_EVENT_LBUTTONDOWN:
@@ -43,6 +54,38 @@ class ObjectTracker:
             ymax = max(y, self.drag_start[1])
             self.selection = (xmin, ymin, xmax - xmin, ymax - ymin)
 
+    def detect_target(self, img, hue):
+        sub = cv.GetSubRect(img, self.selection)
+        save = cv.CloneMat(sub)
+        cv.ConvertScale(img, img, 0.5)
+        cv.Copy(save, sub)
+        x, y, w, h = self.selection
+        cv.Rectangle(img, (x, y), (x + w, y + h), (255, 255, 255))
+
+        sel = cv.GetSubRect(hue, self.selection)
+        cv.CalcArrHist([sel], self.hist, 0)
+        (_, max_val, _, _) = cv.GetMinMaxHistValue(self.hist)
+        if max_val != 0:
+            cv.ConvertScale(self.hist.bins, self.hist.bins, 255. / max_val)
+
+    def cam_shift(self, img, hue):
+        # Compute back projection
+        backproject = cv.CreateImage(cv.GetSize(img), 8, 1)
+
+        # Run the cam-shift
+        cv.CalcArrBackProject([hue], backproject, self.hist)
+        crit = (cv.CV_TERMCRIT_EPS | cv.CV_TERMCRIT_ITER, 10, 1)
+        (iters, (area, value, rect), track_box) = cv.CamShift(backproject, self.track_window, crit)
+        self.track_window = rect
+        return track_box
+
+    def overlayed(self, img, track_box):
+        #cv.EllipseBox(img, track_box, cv.CV_RGB(45, 255, 45), -1, cv.CV_AA, 0)
+        maxdim = max(track_box[1])
+        w, h = map(int, (maxdim * self.overlay_aspect_ratio, maxdim))
+        overlay = self.overlay.resize((w, h), Image.ANTIALIAS)
+        top_left = (track_box[0][0] - w / 2, track_box[0][1] - h / 2)
+        return apply_overlay_image(img, overlay, top_left)
 
     def track_object(self, img):
         # Convert to HSV and keep the hue
@@ -51,47 +94,29 @@ class ObjectTracker:
         hue = cv.CreateImage(cv.GetSize(img), 8, 1)
         cv.Split(hsv, hue, None, None, None)
 
-        # Compute back projection
-        backproject = cv.CreateImage(cv.GetSize(img), 8, 1)
-
-        # Run the cam-shift
-        cv.CalcArrBackProject([hue], backproject, self.hist)
-        if self.track_window and is_rect_nonzero(self.track_window):
-            crit = (cv.CV_TERMCRIT_EPS | cv.CV_TERMCRIT_ITER, 10, 1)
-            (iters, (area, value, rect), track_box) = cv.CamShift(backproject, self.track_window, crit)
-            self.track_window = rect
-
         # If mouse is pressed, highlight the current selected rectangle
         # and recompute the histogram
         if self.drag_start and is_rect_nonzero(self.selection):
-            sub = cv.GetSubRect(img, self.selection)
-            save = cv.CloneMat(sub)
-            cv.ConvertScale(img, img, 0.5)
-            cv.Copy(save, sub)
-            x, y, w, h = self.selection
-            cv.Rectangle(img, (x, y), (x + w, y + h), (255, 255, 255))
+            self.detect_target(img, hue)
 
-            sel = cv.GetSubRect(hue, self.selection)
-            cv.CalcArrHist([sel], self.hist, 0)
-            (_, max_val, _, _) = cv.GetMinMaxHistValue(self.hist)
-            if max_val != 0:
-                cv.ConvertScale(self.hist.bins, self.hist.bins, 255. / max_val)
         elif self.track_window and is_rect_nonzero(self.track_window):
-            #cv.EllipseBox(img, track_box, cv.CV_RGB(45, 255, 45), -1, cv.CV_AA, 0)
-            overlay = cv.LoadImage("python.png")
-            top_left = (track_box[0][0] - overlay.width / 2, track_box[0][1] - overlay.height / 2)
-            overlay_image(img, overlay, top_left, (0,0,0,0), (1,1,1,1))
+            track_box = self.cam_shift(img, hue)
+            if is_rect_nonzero(self.track_window) and is_rect_within_img(self.track_window, img):
+                img = self.overlayed(img, track_box)
+        return img
 
 
 def main():
     MAIN_WINDOW = "ObjectTracker"
     capture = cv.CaptureFromCAM(0)
     cv.NamedWindow(MAIN_WINDOW, 1)
-    tracker = ObjectTracker(MAIN_WINDOW)
+    tracker = ObjectTracker(MAIN_WINDOW, "python.png")
     while True:
         frame = cv.QueryFrame(capture)
-        tracker.track_object(frame)
-        cv.ShowImage(MAIN_WINDOW, frame)
+        # Mirror
+        cv.Flip(frame, frame, 1)
+        img = tracker.track_object(frame)
+        cv.ShowImage(MAIN_WINDOW, img)
         if cv.WaitKey(10) >= 0:
             break
     cv.DestroyWindow(MAIN_WINDOW)
