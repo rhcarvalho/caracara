@@ -16,10 +16,6 @@ from random import sample, uniform
 from objecttracker import ObjectTracker
 from util import cached_times, compute_time
 
-# TODO:
-# - Put sprite on top of tracked object
-
-
 # Parameters for haar detection
 # From the API:
 # The default parameters (scale_factor=2, min_neighbors=3, flags=0) are tuned
@@ -113,9 +109,6 @@ def write_text(img, texts, faces, color=cv.RGB(0, 0, 0)):
     
     Length of texts must be greater than or equal length of faces.""" 
     font = cv.InitFont(fontFace=cv.CV_FONT_HERSHEY_PLAIN, hscale=1.0, vscale=1.0, shear=0, thickness=1, lineType=cv.CV_AA)
-    # consider only faces for which we can pick up a text
-    faces = faces[:len(texts)]
-    texts = sample(texts, len(faces))
     for text, (x, y, w, h) in zip(texts, faces):
         # check size of rendered text
         (width, height), baseline = cv.GetTextSize(text, font)
@@ -128,19 +121,19 @@ def write_text(img, texts, faces, color=cv.RGB(0, 0, 0)):
         
         # test text boundaries against image
         if origin[0] < 0:
-            logging.info("Moved text balloon to the right")
+            logging.debug("Moved text balloon to the right")
             origin = (0, origin[1])
         
         if origin[0] + width > img.width:
-            logging.info("Moved text balloon to the left")
+            logging.debug("Moved text balloon to the left")
             origin = (img.width - width, origin[1])
             
         if origin[1] - height < 0:
-            logging.info("Moved text balloon down")
+            logging.debug("Moved text balloon down")
             origin = (origin[0], height)
             
         if origin[1] > img.height:
-            logging.info("Moved text balloon up")
+            logging.debug("Moved text balloon up")
             origin = (origin[0], img.height - baseline)
         
         center = (origin[0] + width / 2, origin[1] - height / 2)
@@ -166,12 +159,15 @@ def main():
                       default="cascades/haarcascade_frontalface_alt.xml")
     parser.add_option("-f", "--file", action="store", dest="file", type="str",
                       help="Image file")
+    parser.add_option("-o", "--overlay", action="store", dest="overlay", type="str",
+                      help="Object tracking overlay image",
+                      default="images/python.png")
     (options, args) = parser.parse_args()
 
     cascade = cv.Load(options.cascade)
 
     cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
-    tracker = ObjectTracker(MAIN_WINDOW, "python.png")
+    tracker = ObjectTracker(MAIN_WINDOW, options.overlay)
 
     if options.file:
         image_iterator = capture_from_file(options.file)
@@ -179,22 +175,25 @@ def main():
         index = args[:1] and args[0].isdigit() and int(args[0]) or 0
         image_iterator = capture_from_webcam(index)
 
+
+    texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
+
     fps_buffer = []
+    group_size = 20
     for img in image_iterator:
         t = cv.GetTickCount()
         faces = detect_faces(img, cascade)
         img = tracker.track_object(img)
         #draw_surrounding_rectangles(img, faces)
-        texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
         write_text(img, texts, faces)
         cv.ShowImage(MAIN_WINDOW, img)
         if cv.WaitKey(10) >= 0:
             break
         t = cv.GetTickCount() - t
         fps_buffer.append((cv.GetTickFrequency() * 1000000.) / t)
-        if len(fps_buffer) == 10:
-            fps_buffer = [sum(fps_buffer) / 10]
-            logging.debug("%.4f fps" % fps_buffer[0])
+        if len(fps_buffer) == group_size:
+            fps_buffer = [sum(fps_buffer) / group_size]
+            logging.info("%.4f fps" % fps_buffer[0])
 
     cv.DestroyWindow(MAIN_WINDOW)
 

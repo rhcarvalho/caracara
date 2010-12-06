@@ -1,7 +1,7 @@
 import cv
 import logging
 
-logging.basicConfig(level=logging.ERROR,
+logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s [%(levelname)s] %(message)s')
 
 def cached_times(n):
@@ -24,6 +24,6 @@ def compute_time(func):
         t = cv.GetTickCount()
         ret = func(*args, **kwargs)
         t = cv.GetTickCount() - t
-        logging.info("%s time = %gms" % (func.func_name, t / (cv.GetTickFrequency() * 1000.)))
+        logging.debug("%s time = %gms" % (func.func_name, t / (cv.GetTickFrequency() * 1000.)))
         return ret
     return timed_func

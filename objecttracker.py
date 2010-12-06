@@ -2,7 +2,9 @@
 
 import cv
 import Image
+
 from util import compute_time
+
 
 def is_rect_within_img(rect, img):
     x, y, w, h = rect
