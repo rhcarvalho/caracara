@@ -8,10 +8,8 @@ Python implementation by: Roman Stanchak, James Bowman
 """
 import cv
 import logging
-import sys
-from functools import partial
 from optparse import OptionParser
-from random import sample, uniform
+from random import uniform
 from traceback import format_exc
 
 from objecttracker import ObjectTracker
@@ -163,7 +161,7 @@ class CaraCara:
         self.texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
         self.tracker = ObjectTracker(window_name, overlay)
 
-    def run(self):
+    def mainloop(self):
         fps_buffer = []
         group_size = 20
         for img in self.image_iterator:
@@ -174,8 +172,10 @@ class CaraCara:
                 #draw_surrounding_rectangles(img, faces)
                 write_text(img, self.texts, faces)
                 cv.ShowImage(self.window_name, img)
+
                 if cv.WaitKey(10) >= 0:
                     break
+
                 t = cv.GetTickCount() - t
                 fps_buffer.append((cv.GetTickFrequency() * 1000000.) / t)
                 if len(fps_buffer) == group_size:
@@ -183,12 +183,12 @@ class CaraCara:
                     logging.info("%.4f fps" % fps_buffer[0])
             except:
                 logging.critical(format_exc())
-
+                self.tracker.reset()
         cv.DestroyWindow(self.window_name)
 
 
 def main():
-    parser = OptionParser(usage = "usage: %prog [options] [camera_index]")
+    parser = OptionParser(usage="usage: %prog [options] [camera_index]")
     parser.add_option("-c", "--cascade", action="store", dest="cascade", type="str",
                       help="Haar cascade file, default %default",
                       default="cascades/haarcascade_frontalface_alt.xml")
@@ -206,7 +206,7 @@ def main():
         image_iterator = capture_from_webcam(index)
 
     caracara = CaraCara(MAIN_WINDOW, image_iterator, options.cascade, options.overlay)
-    caracara.run()
+    caracara.mainloop()
 
 
 if __name__ == '__main__':

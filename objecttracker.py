@@ -2,8 +2,13 @@
 
 import cv
 import Image
+import logging
+from optparse import OptionParser
+from traceback import format_exc
 
 from util import compute_time
+
+MAIN_WINDOW = "ObjectTracker"
 
 
 def is_rect_within_img(rect, img):
@@ -31,17 +36,20 @@ def apply_overlay_image(src, overlay, (x, y)):
 
 
 class ObjectTracker:
-    def __init__(self, window, overlay):
-        cv.SetMouseCallback(window, self.mouse_handler)
-        self.hist = cv.CreateHist([180], cv.CV_HIST_ARRAY, [(0, 180)], 1)
-
-        self.drag_start = None      # Set to (x,y) when mouse starts drag
-        self.track_window = None    # Set to rect when the mouse drag finishes
-        self.selection = None
-        
+    def __init__(self, window_name, overlay):
+        cv.NamedWindow(window_name, cv.CV_WINDOW_AUTOSIZE)
+        cv.SetMouseCallback(window_name, self.mouse_handler)
+        self.window_name = window_name
         self.overlay = Image.open(overlay).convert("RGBA")
         w, h = map(float, self.overlay.size)
         self.overlay_aspect_ratio = w / h
+        self.reset()
+        
+    def reset(self):
+        self.hist = cv.CreateHist([180], cv.CV_HIST_ARRAY, [(0, 180)], 1)
+        self.drag_start = None      # Set to (x,y) when mouse starts drag
+        self.track_window = None    # Set to rect when the mouse drag finishes
+        self.selection = None
 
     def mouse_handler(self, event, x, y, flags, param):
         if event == cv.CV_EVENT_LBUTTONDOWN:
@@ -107,21 +115,32 @@ class ObjectTracker:
                 img = self.overlayed(img, track_box)
         return img
 
+    def mainloop(self):
+        capture = cv.CaptureFromCAM(0)
+        while True:
+            try:
+                frame = cv.QueryFrame(capture)
+                # Mirror
+                cv.Flip(frame, frame, 1)
+                img = self.track_object(frame)
+                cv.ShowImage(self.window_name, img)
+                if cv.WaitKey(10) >= 0:
+                    break
+            except:
+                logging.critical(format_exc())
+                self.reset()
+        cv.DestroyWindow(self.window_name)
+
 
 def main():
-    MAIN_WINDOW = "ObjectTracker"
-    capture = cv.CaptureFromCAM(0)
-    cv.NamedWindow(MAIN_WINDOW, 1)
-    tracker = ObjectTracker(MAIN_WINDOW, "python.png")
-    while True:
-        frame = cv.QueryFrame(capture)
-        # Mirror
-        cv.Flip(frame, frame, 1)
-        img = tracker.track_object(frame)
-        cv.ShowImage(MAIN_WINDOW, img)
-        if cv.WaitKey(10) >= 0:
-            break
-    cv.DestroyWindow(MAIN_WINDOW)
+    parser = OptionParser(usage="usage: %prog [options]")
+    parser.add_option("-o", "--overlay", action="store", dest="overlay", type="str",
+                      help="Object tracking overlay image",
+                      default="images/python.png")
+    (options, args) = parser.parse_args()
+    
+    tracker = ObjectTracker(MAIN_WINDOW, options.overlay)
+    tracker.mainloop()
 
 
 if __name__ == '__main__':
