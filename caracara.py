@@ -12,6 +12,7 @@ import sys
 from functools import partial
 from optparse import OptionParser
 from random import sample, uniform
+from traceback import format_exc
 
 from objecttracker import ObjectTracker
 from util import cached_times, compute_time
@@ -152,6 +153,40 @@ def draw_balloon(img, rect, color=cv.RGB(255, 255, 255)):
     cv.EllipseBox(img, box=((x, y), (w, h), angle), color=color, thickness=-1, lineType=cv.CV_AA, shift=0)
 
 
+
+class CaraCara:
+    def __init__(self, window_name, image_iterator, cascade, overlay):
+        cv.NamedWindow(window_name, cv.CV_WINDOW_AUTOSIZE)
+        self.window_name = window_name
+        self.image_iterator = image_iterator
+        self.cascade = cv.Load(cascade)
+        self.texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
+        self.tracker = ObjectTracker(window_name, overlay)
+
+    def run(self):
+        fps_buffer = []
+        group_size = 20
+        for img in self.image_iterator:
+            try:
+                t = cv.GetTickCount()
+                faces = detect_faces(img, self.cascade)
+                img = self.tracker.track_object(img)
+                #draw_surrounding_rectangles(img, faces)
+                write_text(img, self.texts, faces)
+                cv.ShowImage(self.window_name, img)
+                if cv.WaitKey(10) >= 0:
+                    break
+                t = cv.GetTickCount() - t
+                fps_buffer.append((cv.GetTickFrequency() * 1000000.) / t)
+                if len(fps_buffer) == group_size:
+                    fps_buffer = [sum(fps_buffer) / group_size]
+                    logging.info("%.4f fps" % fps_buffer[0])
+            except:
+                logging.critical(format_exc())
+
+        cv.DestroyWindow(self.window_name)
+
+
 def main():
     parser = OptionParser(usage = "usage: %prog [options] [camera_index]")
     parser.add_option("-c", "--cascade", action="store", dest="cascade", type="str",
@@ -164,38 +199,14 @@ def main():
                       default="images/python.png")
     (options, args) = parser.parse_args()
 
-    cascade = cv.Load(options.cascade)
-
-    cv.NamedWindow(MAIN_WINDOW, cv.CV_WINDOW_AUTOSIZE)
-    tracker = ObjectTracker(MAIN_WINDOW, options.overlay)
-
     if options.file:
         image_iterator = capture_from_file(options.file)
     else:
         index = args[:1] and args[0].isdigit() and int(args[0]) or 0
         image_iterator = capture_from_webcam(index)
 
-
-    texts = ("Go go my script!", "I am a hack3r :P", "OMG!")
-
-    fps_buffer = []
-    group_size = 20
-    for img in image_iterator:
-        t = cv.GetTickCount()
-        faces = detect_faces(img, cascade)
-        img = tracker.track_object(img)
-        #draw_surrounding_rectangles(img, faces)
-        write_text(img, texts, faces)
-        cv.ShowImage(MAIN_WINDOW, img)
-        if cv.WaitKey(10) >= 0:
-            break
-        t = cv.GetTickCount() - t
-        fps_buffer.append((cv.GetTickFrequency() * 1000000.) / t)
-        if len(fps_buffer) == group_size:
-            fps_buffer = [sum(fps_buffer) / group_size]
-            logging.info("%.4f fps" % fps_buffer[0])
-
-    cv.DestroyWindow(MAIN_WINDOW)
+    caracara = CaraCara(MAIN_WINDOW, image_iterator, options.cascade, options.overlay)
+    caracara.run()
 
 
 if __name__ == '__main__':
